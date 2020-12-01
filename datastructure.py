@@ -50,10 +50,10 @@ Disk = nodeDiskLL()
 # Node definition of File Linked List
 
 
-class nodeFileLL:
-    def __init__(self):
-        self.pma = 0  # offset aka physical memory address
-        self.next = None  # Pointer to next node
+# class nodeFileLL:
+#     def __init__(self):
+#         self.pma = 0  # offset aka physical memory address
+#         # self.next = None  # Pointer to next node
 
 
 # Node definition of File node in tree
@@ -64,7 +64,7 @@ class nodeFile:
         self.path = ""
         self.fileSize = 0
         # self.time = 0
-        self.fileNode = None
+        self.fileInfoList = None
 
 
 # Node definition of Directory node in tree
@@ -113,7 +113,7 @@ def printout(node):
         print("2. Full name: " + currentChild.fullname)
         print("3. File path: " + currentChild.path+"/")
         print("4. File size: " + str(currentChild.fileSize)+" bytes")
-        printFileLL(currentChild.fileNode, currentChild.fileSize)
+        printFileLL(currentChild.fileInfoList, currentChild.fileSize)
         print("----------------------------------------------------------------")
 
 
@@ -142,6 +142,7 @@ def mkdir(node, name):
         gl_dircount += 1
     file = open(gl_inputdir, "a")
     file.write(fullname+"\n")
+    file.flush()
     file.close()
 
 
@@ -165,13 +166,16 @@ def rmdir(node, name):
                 dirList.remove(dirList.nodeat(i))
                 # Update the dir_list.txt file
                 fullname = cd.fullname
+                # print(fullname+str(len(fullname)))
                 file = open(gl_inputdir, "r")
                 lines = file.readlines()
                 file.close()
                 file2 = open(gl_inputdir, "w")
                 for line in lines:
-                    if line.strip("\n") != fullname:
+                    if str(line.strip("\n")+"/") != fullname:
+                        # print(line.strip("\n") + " " + fullname)
                         file2.write(line)
+                        file2.flush()
                 file2.close()
                 return
 
@@ -193,10 +197,12 @@ def mkfile(node, name, size):
     f.filename = name
     f.path = node.path
     # Create a linked list for this file
-    f.fileNode = createFileLL(f.fileSize)
+    f.fileInfoList = dllist()
+    createFileLL(f, f.fileSize)
     # The parent node should have this file in its files DLL
     node.fileDLList.append(f)
     gl_filecount += 1
+    onFileAdd(size)
     # Write new file to file_list.txt
     file = open(gl_inputfile, "a")
     file.write(str(size)+" "+fullname+"\n")
@@ -209,6 +215,7 @@ def rmfile(node, name):
     # First check whether this node(dir) has any files in it
     # If not, return
     if(node.fileDLList == None):
+        print("No such file in this directory")
         return
     # We traverse the list and find the file node to be deleted from DLL.
     for i in range(node.fileDLList.size):
@@ -218,9 +225,10 @@ def rmfile(node, name):
         # Lastly remove the file from the node(dir) DLL of all files
         if(currentChild.filename == name):
             fullname = currentChild.fullname
-            gl_freespace += currentChild.fileSize
-            gl_fragmentation -= countFragmentation(currentChild.fileSize)
-            freeFileLL(currentChild.fileNode)
+            onFileRemove(currentChild.fileSize)
+            # gl_freespace += currentChild.fileSize
+            # gl_fragmentation -= countFragmentation(currentChild.fileSize)
+            freeFileLL(currentChild.fileInfoList)
             node.fileDLList.remove(node.fileDLList.nodeat(i))
             # Update the file_list.txt file.
             file = open(gl_inputfile, "r")
@@ -231,50 +239,79 @@ def rmfile(node, name):
                 each = line.split()
                 if each[1].strip("\n") != fullname:
                     file2.write(line)
+                    file2.flush()
             file2.close()
+
             return
 
 
 # Remove file data aka reduce file size
+
+# Remove file data aka reduce file size
 def remove(node, name, size):
     global gl_blocksize
-    temp = None
+    x = 0
     # No files in the directory
     if node.fileDLList.first == None:
         return
     if size <= 0:
         return
     # Access nodes Files DLL
-    filelist = node.fileDLLlist
+    filelist = node.fileDLList
     # Iterate over every file
     for i in range(node.fileDLList.size):
         cf = filelist[i]
         if cf.filename == name:
-            onFileAdd(0)
-            cf.fileSize = cf.fileSize - size
-            filesize = cf.fileSize
-            onFileRemove(filesize)
-            if (filesize <= 0):
-                freeFileLL(cf.fileNode)
-                cf.fileNode = None
+            onFileRemove(cf.fileSize)
+            x = cf.fileSize - size
+            if(x < 0):
+                print("Cannot remove more bytes than total file size")
+                return
+            cf.fileSize = x
+            f = open(gl_inputfile, "r")
+            lines = f.readlines()
+            f.close()
+            f2 = open(gl_inputfile, "w")
+            for line in lines:
+                each = line.split()
+                if(each[1].strip("\n") != cf.fullname):
+                    f2.write(line)
+                else:
+                    f2.write(str(x)+" "+each[1]+"\n")
+                    f2.flush()
+                    # filesize = cf.fileSize
+            f2.close()
+            onFileAdd(cf.fileSize)
+            if (x == 0):
+                freeFileLL(cf.fileInfoList)
+                cf.fileInfoList = None
                 cf.fileSize = 0
                 return
-            if filesize < gl_blocksize:
-                return
-            while filesize > gl_blocksize:
-                filesize -= gl_blocksize
-                if(temp == None):
-                    temp = cf.fileNode
-                temp = temp.next
-            freeFileLL(temp.next)
-            temp.next = None
+            else:
+                freeFileLL(cf.fileInfoList)
+                cf.fileInfoList = None
+                createFileLL(cf, x)
+            # if x < gl_blocksize:
+            #     return
+            # while x > gl_blocksize:
+            #     x -= gl_blocksize
+            #     if(temp == None):
+            #         temp = cf.fileInfoList
+            #     temp = temp.next
+            # freeFileLL(temp.next)
+            # temp.next = None
             return
 
 
 # Add file data aka increase file size
+# Add file data aka increase file size
 def append(root, name, size):
-    global gl_blocksize
+    global gl_blocksize, gl_freespace
+    new = 0
     # No files in the directory
+    if(size > gl_freespace):
+        print("Not enough freespace")
+        return
     if root.fileDLList.first == None:
         return
     if size <= 0:
@@ -288,16 +325,33 @@ def append(root, name, size):
             onFileRemove(cf.fileSize)
             cf.fileSize = cf.fileSize + size
             new = cf.fileSize
-            onFileAdd(new)
-            if cf.fileNode == None:
-                cf.fileNode = createFileLL(new)
-                return
-            while new > gl_blocksize:
-                new -= gl_blocksize
-                if cf.fileNode.next == None:
-                    cf.fileNode = cf.fileNode.next
+            f = open(gl_inputfile, "r")
+            lines = f.readlines()
+            f.close()
+            f2 = open(gl_inputfile, "w")
+            for line in lines:
+                each = line.split()
+                if(each[1].strip("\n") != cf.fullname):
+                    f2.write(line)
                 else:
-                    cf.fileNode.next = createFileLL(new)
+                    f2.write(str(new)+" "+each[1]+"\n")
+                    # filesize = cf.fileSize
+            f2.flush()
+            f2.close()
+            onFileAdd(new)
+            if cf.fileInfoList == None:
+                createFileLL(cf, new)
+                return
+            else:
+                freeFileLL(cf.fileInfoList)
+                cf.fileInfoList = None
+                createFileLL(cf, new)
+            # while new > gl_blocksize:
+            #     new -= gl_blocksize
+            #     if cf.fileInfoList.next == None:
+            #         cf.fileInfoList = cf.fileInfoList.next
+            #     else:
+            #         cf.fileInfoList.next = createFileLL(new)
             return
 
 
@@ -401,7 +455,6 @@ def readFile(argc):
         exit(1)
     print(f.read())
 
-
 # ************************** Tree ***************************
 # init_dir(t_dir *, char *);
 # init_file(char **);
@@ -437,6 +490,7 @@ def initDir(parent, name):
 
 # Initializes a file node
 def initFile(name, size=0):
+    global gl_freespace
     if (size > gl_freespace):
         print("Not enough memory space!\n")
         return
@@ -452,11 +506,11 @@ def initFile(name, size=0):
         for k in range(i+1, len(name)):
             newFile.filename += name[k]
     newFile.fileSize = size
-    newFile.fileNode = createFileLL(size)
+    createFileLL(newFile, size)
     return newFile
 
 
-# Finds the directory of file given as 2nd argument
+# Finds the directory of path given as 2nd argument
 def findDir(dir, name):
     if(dir.fullname in name):
         if(dir.dirDLList.size == 0):
@@ -483,6 +537,7 @@ def createTree():
 
 # Yet to comment
 def initDirDLL():
+    global root, gl_dircount
     file = open(gl_inputdir, "r")
     file.flush()
     if(file == None):
@@ -490,7 +545,6 @@ def initDirDLL():
         exit(1)
     temp = file.read().splitlines()
     for each in temp:
-        global root, gl_dircount
         if(root == None):
             root = initDir(root, each)
             gl_dircount += 1
@@ -505,9 +559,9 @@ def initDirDLL():
 
 
 def initFileDLL():
-    global gl_filecount
+    global gl_filecount, root
     # Input file has entries as follows
-    # <size> <full name>
+    # (size) (name)
     # 2048 ./1A/2B/meema.txt
     f = open(gl_inputfile, "r")
     f.flush()
@@ -573,11 +627,11 @@ def printTree(node, tab):
 
 
 # Returns LL specifying all memory locations of file blocks.
-def createFileLL(fSize):
+def createFileLL(node, fSize):
     global gl_blocksize
-    t_file = nodeFileLL()
-    current = nodeFileLL()
-    new = nodeFileLL()
+    node.fileInfoList = dllist()
+    # t_file = nodeFileLL()
+    # current = nodeFileLL()
     blocks = 1
     i = 0
     if fSize > 0:
@@ -587,27 +641,32 @@ def createFileLL(fSize):
         if fSize != (blocks * gl_blocksize):
             blocks += 1
     else:
-        return None
+        return
     for i in range(blocks):
         # find offset of every block according to disk.
-        new.pma = requestDiskSpace() * gl_blocksize
-        new.next = None
-        if i == 0:  # First node in LL.
-            t_file = new
-            current = new
-        else:  # All subsequent nodes
-            current.next = new
-            current = current.next
-    return t_file
+        # new = nodeFileLL()
+        pma = requestDiskSpace() * gl_blocksize
+        node.fileInfoList.append(pma)
+    # for i in range(blocks):
+    #     # find offset of every block according to disk.
+    #     new.pma = requestDiskSpace() * gl_blocksize
+    #     new.next = None
+    #     if i == 0:  # First node in LL.
+    #         t_file = new
+    #         current = new
+    #     else:  # All subsequent nodes
+    #         current.next = new
+    #         current = current.next
+    # return t_file
 
 
 # Visits every node and prints its PMA value
 # along with the size every node is taking in memory
 def printFileLL(LL, fSize):
     i = 1
-    print("\nLinked list of size " + str(fSize)+":\n")
-    while(LL != None):
-        print("\t"+str(i)+". Memory location: " + str(LL.pma), end=" - ")
+    print("\nFile stored in " + str(LL.size)+" piece(s):\n")
+    for value in LL:
+        print("\t"+str(i)+". Memory location: " + str(value), end=" - ")
         i += 1
         if fSize > gl_blocksize:
             print("Used memory: " + str(gl_blocksize) +
@@ -617,17 +676,32 @@ def printFileLL(LL, fSize):
         else:
             # Print the value of used size within a block.
             print("Used memory: " + str(fSize)+"/"+str(gl_blocksize)+" bytes")
-            break
-        LL = LL.next
+            # break
+    # while(LL != None):
+    #     print("\t"+str(i)+". Memory location: " + str(LL.pma), end=" - ")
+    #     i += 1
+    #     if fSize > gl_blocksize:
+    #         print("Used memory: " + str(gl_blocksize) +
+    #               "/"+str(gl_blocksize)+" bytes")
+    #         # Decrease size every iteration by block size.
+    #         fSize -= gl_blocksize
+    #     else:
+    #         # Print the value of used size within a block.
+    #         print("Used memory: " + str(fSize)+"/"+str(gl_blocksize)+" bytes")
+    #         break
+    #     LL = LL.next
 
 
 # Frees up used blocks in disk
 def freeFileLL(LL):
-    if(LL == None):
+    global gl_blocksize
+    if(LL == None or len(LL) == 0):
         return
-    while(LL != None):
-        freeOccupiedDiskSpace(LL.pma/gl_blocksize)
-        LL = LL.next
+    for value in LL:
+        freeOccupiedDiskSpace(value/gl_blocksize)
+    # while(LL != None):
+    #     freeOccupiedDiskSpace(LL.pma/gl_blocksize)
+    #     LL = LL.next
 
 
 # Returns the leftover space in last block
@@ -650,7 +724,7 @@ def onFileAdd(fSize):
 
 # Recalculates global freespace and global fragmentation
 def onFileRemove(fSize):
-    global gl_freespace, gl_fragmentation
+    global gl_freespace, gl_fragmentation, gl_blocksize
     gl_freespace += fSize
     gl_fragmentation -= countFragmentation(fSize)
 
@@ -663,8 +737,8 @@ def onFileRemove(fSize):
 # free_Ldisk(int);
 
 def initDisk():
+    global gl_freespace, gl_fragmentation, gl_totalblock, gl_disksize, Disk
     # Find the number of blocks in disk
-    global gl_totalblock, gl_fragmentation, gl_freespace, Disk
     gl_totalblock = gl_disksize/gl_blocksize
     # Disk is empty aka free
     Disk.status = "FREE"
@@ -726,6 +800,7 @@ def requestDiskSpace():
 
 # Updates disk such that we have only 2 nodes(with status USED and FREE)
 def updateDisk():
+    global Disk
     temp = nodeDiskLL()
     previous = Disk
     current = Disk.next
@@ -781,7 +856,7 @@ def freeOccupiedDiskSpace(start):
                 temp.next = new
                 new.next = current
                 current.begin = start+1
-                updateDisk
+                updateDisk()
                 break
         previous = current
         current = current.next
@@ -809,46 +884,89 @@ def main(argc, argv):
     while(True):
         val = input(current.fullname+"> ")
         vect = val.split()
-        if (vect[0] == "exit"):
+        if(len(vect) == 0):
+            continue
+        elif (vect[0] == "exit"):
             exit(0)
         elif ((vect[0] == "dir") or (vect[0] == "ls")):
+            print("")
             dirORls(current)
-        elif (vect[0] == "prdisk"):
+            print("")
+        elif (vect[0] == "printdisk"):
+            print("")
             printDisk()
+            print("")
         elif (vect[0] == "cd"):
+            if (len(vect) != 2):
+                print("Wrong input, use 'cd <directory name>' or 'cd ..'")
+                continue
             if (vect[1] == ".."):
                 if(current == root):
-                    print("Permission denied!")
+                    print("")
+                    print("Permission denied!\n")
                 else:
+                    print("")
                     current = current.parentDir
             else:
                 temp = chdir(current, vect[1])
                 if (temp != None):
+                    print("")
                     current = temp
                 else:
-                    print(vect[1]+": No such file or directory")
+                    print("")
+                    print(vect[1]+": No such file or directory\n")
         elif (vect[0] == "printfiles"):
+            print("")
             printout(current)
+            print("")
         elif (vect[0] == "printtree"):
+            print("")
             printTree(current, 0)
             print("")
         elif (vect[0] == "mkdir"):
+            if (len(vect) != 2):
+                print("Wrong input, use 'mkdir <directory name>'")
+                continue
+            print("")
             mkdir(current, vect[1])
+            print("")
         elif (vect[0] == "rmdir"):
+            if (len(vect) != 2):
+                print("Wrong input, use 'rmdir <directory name>'")
+                continue
+            print("")
             rmdir(current, vect[1])
-        elif (vect[0] == "delete"):
-            rmdir(current, vect[1])
-            rmfile(current, vect[1])
+            print("")
         elif (vect[0] == "create"):
+            print("")
+            if (len(vect) != 3):
+                print("Wrong input, use 'create <file name> <file size>'")
+                continue
             mkfile(current, vect[1], eval(vect[2]))
+            print("")
         elif (vect[0] == "removefile"):
+            if (len(vect) != 2):
+                print("Wrong input, use 'removefile <file name>'")
+                continue
+            print("")
             rmfile(current, vect[1])
+            print("")
         elif (vect[0] == "removebytes"):
+            if (len(vect) != 3):
+                print("Wrong input, use 'removebytes <file name> <No. of bytes>'")
+                continue
+            print("")
             remove(current, vect[1], eval(vect[2]))
+            print("")
         elif (vect[0] == "appendbytes"):
+            if (len(vect) != 3):
+                print("Wrong input, use 'appendbytes <file name> <No. of bytes>'")
+                continue
+            print("")
             append(current, vect[1], eval(vect[2]))
+            print("")
         else:
-            print(vect[0]+": No such command, try again.")
+            print(vect[0]+": No such command, try again.\n")
     return 0
 
 
