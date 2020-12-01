@@ -42,18 +42,11 @@ class nodeDiskLL:
         self.status = "FREE"
         self.begin = 0
         self.end = 0
-        self.next = None
+        # self.next = None
 
 
-Disk = nodeDiskLL()
-
-# Node definition of File Linked List
-
-
-# class nodeFileLL:
-#     def __init__(self):
-#         self.pma = 0  # offset aka physical memory address
-#         # self.next = None  # Pointer to next node
+# Disk = nodeDiskLL()
+Disk = dllist()
 
 
 # Node definition of File node in tree
@@ -63,7 +56,6 @@ class nodeFile:
         self.fullname = ""
         self.path = ""
         self.fileSize = 0
-        # self.time = 0
         self.fileInfoList = None
 
 
@@ -79,20 +71,19 @@ class nodeDir:
 
 
 # Creating a root node
-# root = nodeDir()
 root = None
 
 
 # ************* Main program helper functions ***************
-# dir(t_dir *);
-# chdir(t_dir *, char *); #CAN IGNORE THIS FOR NOW
-# printout(t_dir *);
-# mkdir(t_dir *, char *); #IMPORTANT
-# rmdir(t_dir *, char *); #IMPORTANT
-# mkfile(t_dir *, char *); #IMPORTANT
-# rmfile(t_dir *, char *); #IMPORTANT
-# remove(t_dir *, char *, int); #IMPORTANT
-# append(t_dir *, char *, int); #IMPORTANT
+# dirORls(<dir node>) -> Prints out the items in a directory #DONE
+# printout(<dir node>) -> Prints meta info about files in a directory #DONE
+# chdir(<parentDir node>, <dir name>) -> Change Directory #DONE
+# mkdir(<parentDir node>, <dir name>) -> Creates a new directory #DONE
+# rmdir(<parentDir node>, <dir name>) -> Removes a directory #DONE
+# mkfile(<parentDir node>, <file name>, <file size>) -> Creates a new file #DONE
+# rmfile(<parentDir node>, <file name>) -> Removes a file #DONE
+# remove(<parentDir node>, <file name>, <file size>) -> Remove bytes from file #DONE
+# append(<parentDir node>, <file name>, <file size>) -> Append bytes to a file #DONE
 
 
 # Prints out the items in a directory
@@ -103,7 +94,7 @@ def dirORls(node):
         print(node.fileDLList[j].filename)
 
 
-# Print meta info
+# Print meta info about files in a directory
 def printout(node):
     l = node.fileDLList
     for each in range(len(l)):
@@ -184,7 +175,8 @@ def rmdir(node, name):
 def mkfile(node, name, size):
     global gl_filecount
     if(size > gl_freespace):
-        print("No more freespace")
+        print("Not enough freespace, current freespace: " +
+              str(gl_freespace)+" bytes")
         return
     fullname = ""
     f = nodeFile()
@@ -246,8 +238,6 @@ def rmfile(node, name):
 
 
 # Remove file data aka reduce file size
-
-# Remove file data aka reduce file size
 def remove(node, name, size):
     global gl_blocksize
     x = 0
@@ -304,7 +294,6 @@ def remove(node, name, size):
 
 
 # Add file data aka increase file size
-# Add file data aka increase file size
 def append(root, name, size):
     global gl_blocksize, gl_freespace
     new = 0
@@ -356,11 +345,11 @@ def append(root, name, size):
 
 
 # ********************** Input checks **********************
-# std_input_check(int, char **);
-# std_input_error(int);
-# std_param_check(char *, int);
-# std_input_files();
-# read_file(char *);
+# inputCheck(<No. of args>, <args list>) -> Checks Input arguments #DONE
+# inputError(arg) -> Displays Appropriate error #DONE (NOT USED THO)
+# paramCheck(str, i) -> Helper function to inputCheck #DONE
+# inputFiles() -> Prints the names of input files we'll run our script on #DONE
+# readFile(argc) -> Opens the readme file #DONE (NOT USED THO)
 
 
 # Check if there are 4 args. If yes, then checks their correctness
@@ -456,12 +445,13 @@ def readFile(argc):
     print(f.read())
 
 # ************************** Tree ***************************
-# init_dir(t_dir *, char *);
-# init_file(char **);
-# create_GTree();
-# init_GDirs();
-# init_GFiles();
-# print_GTree(t_dir *, int);
+# initDir(<parent Dir>, <dir name>) -> Initializes a directory node #DONE
+# initFile(<file name>, <file size>) -> Initializes a file node #DONE
+# findDir(<parent Dir>, <dir name>) -> Searches for a directory #DONE
+# createTree() -> Runs the next two functions (Modularity :P) #DONE
+# initDirDLL() -> Initializes Child dir list of every directory node #DONE
+# initFileDLL() -> Initializes Child files list of every directory node #DONE
+# printTree(<dir node>, <tab for spaces>) -> Prints tree to visualize #DONE
 
 
 # Initializes a directory node
@@ -618,12 +608,12 @@ def printTree(node, tab):
 
 
 # ******************** File Linked List *********************
-# create_Lfile(int);
-# print_Lfile(t_file *, int);
-# free_Lfile(t_file *);
-# count_fragmentation(int);
-# plus_filesize(int);
-# minus_filesize(int);
+# createFileLL(<file node>, <file size>) -> Returns a file storage info list
+# printFileLL(<File info list>, <file size>) -> Prints the file storage info
+# freeFileLL(<File info list>) -> Clears file info list and occupied space in disk
+# countFragmentation(<File size>) -> Returns the leftover space in block
+# onFileAdd(<file size>) -> Recalculates global freespace and global fragmentation
+# onFileRemove(<file size>) -> Recalculates global freespace and global fragmentation
 
 
 # Returns LL specifying all memory locations of file blocks.
@@ -730,36 +720,41 @@ def onFileRemove(fSize):
 
 
 # ******************** Disk Linked List *********************
-# init_Ldisk();
-# print_Ldisk();
-# request_Ldisk();
-# update_Ldisk();
-# free_Ldisk(int);
+# initDisk() -> Initializes Disk using arguments given when running script
+# printDisk() -> Prints the status of Disk
+# requestDiskSpace() -> Finds free block and returns its block number
+# updateDisk() -> Ensures we have at most 2 nodes in Disk Linked List
+# freeOccupiedDiskSpace(<starting address>) -> Frees used space
 
 def initDisk():
     global gl_freespace, gl_fragmentation, gl_totalblock, gl_disksize, Disk
     # Find the number of blocks in disk
     gl_totalblock = gl_disksize/gl_blocksize
+    node = nodeDiskLL()
     # Disk is empty aka free
-    Disk.status = "FREE"
+    node.status = "FREE"
+    node.begin = 0
     # Disk blocks 0 to max-1 are all free
-    Disk.begin = 0
-    Disk.end = gl_totalblock - 1
+    node.end = gl_totalblock - 1
     # Only one node
-    Disk.next = None
+    Disk.append(node)
     gl_fragmentation = 0
     # All space is free
     gl_freespace = gl_totalblock*gl_blocksize
 
 
 def printDisk():
-    temp = Disk
-    while(temp != None):
-        if(temp.status == "FREE"):
-            print("Free blocks from " + str(temp.begin) + " to " + str(temp.end))
+    global Disk
+    # Traverse through Disk and print block number that are used and free
+    # Note: There will only be 2 nodes to traverse because remember, we ensure
+    # that using the updateDisk function
+    for i in range(len(Disk)):
+        if(Disk[i].status == "FREE"):
+            print("Free blocks from " +
+                  str(Disk[i].begin) + " to " + str(Disk[i].end))
         else:
-            print("Used blocks from " + str(temp.begin) + " to " + str(temp.end))
-        temp = temp.next
+            print("Used blocks from " +
+                  str(Disk[i].end) + " to " + str(Disk[i].begin))
     print("Fragmentation: " + str(gl_fragmentation) + " bytes")
     print("Free Disk Space: " + str(gl_freespace) + " bytes")
 
@@ -769,31 +764,22 @@ def requestDiskSpace():
     global Disk
     temp = nodeDiskLL()
     current = Disk
-    previous = None
+    i = 0
     # Iterate till an empty space is found
-    while(current.status == "USED"):
-        previous = current
-        if(current.next == None):
-            print("No more available storage space")
-            return -1
-        current = current.next
-    # FREE space found
-    # If more than one contigious block is free
-    # Isolate the first free block and return its block number
-    if(current.begin != current.end):
-        temp.status = "USED"
-        temp.begin = current.begin
-        temp.end = current.begin
-        current.begin += 1
-        temp.next = current
-    else:  # Only single block is free, use it.
-        temp = current
-        temp.status = "USED"
-    # If the first block of disk is found to be free.
-    if(previous == None):
-        Disk = temp
-    else:
-        previous.next = temp
+    for i in range(current.size):
+        # FREE space found
+        # If more than one contigious block is free
+        # Isolate the first free block and return its block number
+        if(current[i].status == "FREE"):
+            if(current[i].begin != current[i].end):
+                temp.status = "USED"
+                temp.begin = current[i].begin
+                temp.end = current[i].begin
+                current[i].begin += 1
+                current.appendleft(temp)
+            else:  # Only single block is free, use it.
+                current[i].status = "USED"
+    # 2 nodes at all times
     updateDisk()
     return temp.begin
 
@@ -801,65 +787,54 @@ def requestDiskSpace():
 # Updates disk such that we have only 2 nodes(with status USED and FREE)
 def updateDisk():
     global Disk
-    temp = nodeDiskLL()
-    previous = Disk
-    current = Disk.next
-    while(current != None):
+    # Run Disksize - 1 to prevent index out of bounds
+    for i in range(Disk.size - 1):
+        nextChildBlock = Disk[i+1]
+        childBlock = Disk[i]
         # If both statuses same, merge the blocks together
-        if(previous.status == current.status):
-            previous.end = current.end
-            previous.next = current.next
-            temp = current
-            del temp
-            current = current.next
+        if(childBlock.status == nextChildBlock.status):
+            childBlock.end = nextChildBlock.end
+            Disk.remove(Disk.nodeat(i+1))
             updateDisk()
-        else:
-            previous = current
-            current = current.next
+            # Important to break, or else it will
+            # go out of bound on its way back from recursion
+            break
 
 
-# PUT COMMENTS IN THIS FUNCTION
+# Frees up the used blocks depending on starting address
 def freeOccupiedDiskSpace(start):
     global Disk
-    new = nodeDiskLL()
     current = Disk
-    previous = None
+    # Create a free block node
+    new = nodeDiskLL()
     new.status = "FREE"
     new.begin = start
     new.end = start
-    while(current != None):
-        if(current.begin <= start and current.end >= start):
-            if(current.begin == start):
-                if(previous != None):
-                    previous.next = new
-                else:
-                    Disk = new
-                new.next = current
-                current.begin += 1
+    for i in range(Disk.size):
+        # If current node is before or after start address
+        if(current[i].begin <= start and current[i].end >= start):
+            # Begin address matches start address
+            if(current[i].begin == start):
+                current.insert(new, current[i])
+                current[i].begin += 1
                 updateDisk()
                 break
-            elif(current.end == start):
-                current.end = current.end - 1
-                new.next = current.next
-                current.next = new
+            # End address matches start address
+            elif(current[i].end == start):
+                current[i].end -= 1
+                current.insert(new, current[i+1])
                 updateDisk()
                 break
-            else:
+            else:  # start address is somewhere in between begin and end
                 temp = nodeDiskLL()
                 temp.status = "USED"
-                temp.begin = current.begin
-                temp.end = start-1
-                if(previous != None):
-                    previous.next = temp
-                else:
-                    Disk = temp
-                temp.next = new
-                new.next = current
-                current.begin = start+1
+                temp.begin = current[i].begin
+                temp.end = start - 1
+                current.insert(temp, current[i])
+                current.insert(new, current[i])
+                current.begin = start + 1
                 updateDisk()
                 break
-        previous = current
-        current = current.next
 
 
 def main(argc, argv):
