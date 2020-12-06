@@ -25,3 +25,5 @@ Commands:
 11) removebytes <file_name> <No. of bytes> - Removes the given bytes from a file.
 12) printtree - Prints the structure of filesystem
 13) exit - To quit the program
+
+*** To understand the working of this project, read the description.pdf file ***
