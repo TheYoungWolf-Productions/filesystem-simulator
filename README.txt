@@ -26,4 +26,4 @@ Commands:
 12) printtree - Prints the structure of filesystem
 13) exit - To quit the program
 
-*** To understand the working of this project, read the Description.pdf file ***
+*** To understand the working of this project, read the Description.docx file ***
